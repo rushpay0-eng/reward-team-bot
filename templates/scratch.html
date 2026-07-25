@@ -1,6 +1,152 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Scratch Card</title><script src="https://telegram.org/js/telegram-web-app.js"></script><link rel="stylesheet" href="/static/style.css"></head><body><main><h1>🎁 Lucky Scratch Card</h1><p>Finger se silver layer scratch karein</p><div class="scratch"><div class="prize"><span>YOU WON</span><strong>₹{{reward}}</strong><small>Congratulations!</small></div><canvas id="c"></canvas></div><p id="msg">Scratch to reveal</p><button id="claim" disabled>Claim Reward</button><div id="result"></div></main><script>
-Telegram.WebApp.ready();Telegram.WebApp.expand();const c=document.getElementById('c'),box=document.querySelector('.scratch'),x=c.getContext('2d',{willReadFrequently:true});let down=false,done=false;c.width=box.clientWidth;c.height=box.clientHeight;let g=x.createLinearGradient(0,0,c.width,c.height);g.addColorStop(0,'#eee');g.addColorStop(.5,'#777');g.addColorStop(1,'#ddd');x.fillStyle=g;x.fillRect(0,0,c.width,c.height);x.fillStyle='#222';x.font='bold 24px Arial';x.textAlign='center';x.fillText('SCRATCH HERE',c.width/2,c.height/2);
-function p(e){let r=c.getBoundingClientRect(),q=e.touches?e.touches[0]:e;return{x:q.clientX-r.left,y:q.clientY-r.top}}function move(e){if(!down||done)return;e.preventDefault();let q=p(e);x.globalCompositeOperation='destination-out';x.beginPath();x.arc(q.x,q.y,25,0,Math.PI*2);x.fill()}function check(){let d=x.getImageData(0,0,c.width,c.height).data,z=0,n=0;for(let i=3;i<d.length;i+=40){n++;if(d[i]===0)z++}if(z/n>.42&&!done){done=true;x.clearRect(0,0,c.width,c.height);document.getElementById('msg').textContent='Reward revealed!';document.getElementById('claim').disabled=false}}
-['mousedown','touchstart'].forEach(v=>c.addEventListener(v,e=>{down=true;move(e)}));['mousemove','touchmove'].forEach(v=>c.addEventListener(v,move,{passive:false}));['mouseup','mouseleave','touchend'].forEach(v=>c.addEventListener(v,()=>{down=false;check()}));
-document.getElementById('claim').onclick=async()=>{let b=document.getElementById('claim');b.disabled=true;b.textContent='Claiming...';let r=await fetch('/api/scratch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:'{{token}}',stage:{{stage}}})}),d=await r.json();if(d.ok){document.getElementById('result').innerHTML=`<div class="success">✅ ₹${d.reward} balance me add ho gaya.<br>${d.next}</div>`;b.textContent='Reward Claimed'}};
-</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Scratch Card</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .back-btn{margin-top:12px;background:#ffffff1a;color:#fff;border:1px solid #ffffff55}
+    .notice{margin:14px 0;padding:14px;border-radius:12px;background:#ffffff16;line-height:1.5}
+  </style>
+</head>
+<body>
+<main>
+  <h1>🎁 Lucky Scratch Card</h1>
+  <p>Finger se silver layer scratch karein</p>
+
+  <div class="scratch">
+    <div class="prize">
+      <span>YOU WON</span>
+      <strong>₹{{ reward }}</strong>
+      <small>Congratulations!</small>
+    </div>
+    <canvas id="c"></canvas>
+  </div>
+
+  <p id="msg">
+    {% if already_claimed %}
+      Reward pehle hi claim ho chuka hai.
+    {% else %}
+      Scratch to reveal
+    {% endif %}
+  </p>
+
+  <button id="claim" {% if already_claimed %}disabled{% else %}disabled{% endif %}>
+    {% if already_claimed %}Already Claimed{% else %}Claim Reward{% endif %}
+  </button>
+
+  <button id="back" class="back-btn">⬅️ Back to Bot</button>
+  <div id="result">
+    {% if already_claimed %}
+      <div class="notice">Is Scratch Card ka reward dobara add nahi hoga. Back to Bot par tap karke next step complete karein.</div>
+    {% endif %}
+  </div>
+</main>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+document.getElementById('back').onclick = () => tg.close();
+
+const alreadyClaimed = {{ 'true' if already_claimed else 'false' }};
+const c = document.getElementById('c');
+const box = document.querySelector('.scratch');
+const x = c.getContext('2d', {willReadFrequently:true});
+let down = false;
+let done = alreadyClaimed;
+
+c.width = box.clientWidth;
+c.height = box.clientHeight;
+
+function revealAll() {
+  x.clearRect(0, 0, c.width, c.height);
+}
+
+if (alreadyClaimed) {
+  revealAll();
+} else {
+  const g = x.createLinearGradient(0,0,c.width,c.height);
+  g.addColorStop(0,'#eee');
+  g.addColorStop(.5,'#777');
+  g.addColorStop(1,'#ddd');
+  x.fillStyle = g;
+  x.fillRect(0,0,c.width,c.height);
+  x.fillStyle = '#222';
+  x.font = 'bold 24px Arial';
+  x.textAlign = 'center';
+  x.fillText('SCRATCH HERE',c.width/2,c.height/2);
+}
+
+function p(e) {
+  const r = c.getBoundingClientRect();
+  const q = e.touches ? e.touches[0] : e;
+  return {x:q.clientX-r.left,y:q.clientY-r.top};
+}
+
+function move(e) {
+  if (!down || done) return;
+  e.preventDefault();
+  const q = p(e);
+  x.globalCompositeOperation = 'destination-out';
+  x.beginPath();
+  x.arc(q.x,q.y,25,0,Math.PI*2);
+  x.fill();
+}
+
+function check() {
+  const d = x.getImageData(0,0,c.width,c.height).data;
+  let clear = 0;
+  let checked = 0;
+  for (let i=3;i<d.length;i+=40) {
+    checked++;
+    if (d[i]===0) clear++;
+  }
+  if (clear/checked > .42 && !done) {
+    done = true;
+    revealAll();
+    document.getElementById('msg').textContent = 'Reward revealed!';
+    document.getElementById('claim').disabled = false;
+  }
+}
+
+if (!alreadyClaimed) {
+  ['mousedown','touchstart'].forEach(v => c.addEventListener(v,e => {down=true;move(e)}));
+  ['mousemove','touchmove'].forEach(v => c.addEventListener(v,move,{passive:false}));
+  ['mouseup','mouseleave','touchend'].forEach(v => c.addEventListener(v,() => {down=false;check()}));
+}
+
+document.getElementById('claim').onclick = async () => {
+  const b = document.getElementById('claim');
+  b.disabled = true;
+  b.textContent = 'Claiming...';
+
+  try {
+    const r = await fetch('/api/scratch',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:'{{ token }}',stage:{{ stage }}})
+    });
+    const d = await r.json();
+
+    if (!d.ok) {
+      throw new Error(d.error || 'Reward claim failed');
+    }
+
+    document.getElementById('result').innerHTML =
+      `<div class="success">✅ ₹${d.reward} balance me add ho gaya.<br>${d.next}<br><br>Telegram me next-step message bhej diya gaya hai.</div>`;
+    b.textContent = d.already ? 'Already Claimed' : 'Reward Claimed';
+    tg.HapticFeedback.notificationOccurred('success');
+  } catch (err) {
+    b.disabled = false;
+    b.textContent = 'Try Again';
+    document.getElementById('result').innerHTML =
+      `<div class="notice">❌ ${err.message}</div>`;
+  }
+};
+</script>
+</body>
+</html>
