@@ -1,0 +1,5 @@
+.env
+__pycache__/
+*.pyc
+reward_bot.db
+.venv/
