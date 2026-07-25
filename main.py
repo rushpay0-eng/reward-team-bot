@@ -61,9 +61,132 @@ def verify_token(t,purpose):
 def wurl(path,uid,purpose): return f'{PUBLIC_URL}{path}?token={quote(token(uid,purpose))}'
 
 def menu():
-    return InlineKeyboardMarkup([[InlineKeyboardButton('📢 Join Channel',url=CHANNEL_LINK),InlineKeyboardButton('👥 Join Group',url=GROUP_LINK)],[InlineKeyboardButton('✅ Verify & Unlock',callback_data='verify')],[InlineKeyboardButton('🎁 My Rewards',callback_data='rewards'),InlineKeyboardButton('💸 Withdrawal',callback_data='withdraw')]])
-def reg_menu(): return InlineKeyboardMarkup([[InlineKeyboardButton('📝 Complete Registration',url=REGISTRATION_LINK)],[InlineKeyboardButton('📸 Upload Proof',callback_data='reg_upload')]])
-def newbie_menu(): return InlineKeyboardMarkup([[InlineKeyboardButton('📸 Upload Proof',callback_data='newbie_upload')]])
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton('📢 Official Channel', url=CHANNEL_LINK),
+            InlineKeyboardButton('👥 Community Group', url=GROUP_LINK),
+        ],
+        [InlineKeyboardButton('✅ Verify Membership', callback_data='verify')],
+        [
+            InlineKeyboardButton('🎁 Rewards & Progress', callback_data='rewards'),
+            InlineKeyboardButton('💳 Withdrawal', callback_data='withdraw'),
+        ],
+        [InlineKeyboardButton('❓ Help & Support', callback_data='support')],
+    ])
+
+
+def reg_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('🌐 Complete Registration', url=REGISTRATION_LINK)],
+        [InlineKeyboardButton('📤 Submit Registration Proof', callback_data='reg_upload')],
+        [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')],
+    ])
+
+
+def newbie_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('📤 Submit Newbie Order Proof', callback_data='newbie_upload')],
+        [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')],
+    ])
+
+
+def progress_text(u):
+    completed = sum([
+        u['first_status'] == 'used',
+        u['second_status'] == 'used',
+        u['wheel_status'] == 'used',
+    ])
+
+    if not u['verified']:
+        current = 'Step 1 — Join and verify membership'
+    elif u['first_status'] != 'used':
+        current = 'Step 1 — Claim Welcome Scratch'
+    elif u['registration_status'] in {'not_submitted', 'rejected'}:
+        current = 'Step 2 — Complete registration'
+    elif u['registration_status'] == 'pending':
+        current = 'Step 2 — Registration review pending'
+    elif u['second_status'] != 'used':
+        current = 'Step 2 — Claim Registration Scratch'
+    elif u['newbie_status'] in {'not_submitted', 'rejected'}:
+        current = 'Step 3 — Complete Newbie Order'
+    elif u['newbie_status'] == 'pending':
+        current = 'Step 3 — Newbie Order review pending'
+    elif u['wheel_status'] != 'used':
+        current = 'Step 3 — Spin Lucky Wheel'
+    else:
+        current = 'All reward steps completed'
+
+    return completed, current
+
+
+def dashboard_text(u):
+    completed, current = progress_text(u)
+    return (
+        '🎁 <b>UPI TASK REWARDS</b>\n\n'
+        f'Hello {u["first_name"] or "User"} 👋\n\n'
+        'Complete each verified step to unlock your rewards.\n\n'
+        f'<b>Progress:</b> {completed}/3 completed\n'
+        f'<b>Current Step:</b> {current}\n\n'
+        f'💰 <b>Available Balance:</b> ₹{u["balance"]}\n'
+        f'💳 <b>Minimum Withdrawal:</b> ₹{MIN_WITHDRAWAL}'
+    )
+
+
+def dashboard_keyboard(u):
+    rows = []
+
+    if not u['verified']:
+        rows.extend([
+            [
+                InlineKeyboardButton('📢 Join Official Channel', url=CHANNEL_LINK),
+                InlineKeyboardButton('👥 Join Community Group', url=GROUP_LINK),
+            ],
+            [InlineKeyboardButton('✅ Verify Membership', callback_data='verify')],
+        ])
+    elif u['first_status'] != 'used':
+        rows.append([
+            InlineKeyboardButton(
+                '🎁 Open Welcome Scratch',
+                web_app=WebAppInfo(wurl('/scratch/1', u['user_id'], 's1')),
+            )
+        ])
+    elif u['registration_status'] in {'not_submitted', 'rejected'}:
+        rows.extend([
+            [InlineKeyboardButton('🌐 Complete Registration', url=REGISTRATION_LINK)],
+            [InlineKeyboardButton('📤 Submit Registration Proof', callback_data='reg_upload')],
+        ])
+    elif u['registration_status'] == 'pending':
+        rows.append([InlineKeyboardButton('⏳ Registration Under Review', callback_data='status_info')])
+    elif u['second_status'] != 'used':
+        rows.append([
+            InlineKeyboardButton(
+                '🎁 Open Registration Scratch',
+                web_app=WebAppInfo(wurl('/scratch/2', u['user_id'], 's2')),
+            )
+        ])
+    elif u['newbie_status'] in {'not_submitted', 'rejected'}:
+        rows.append([
+            InlineKeyboardButton('📤 Submit Newbie Order Proof', callback_data='newbie_upload')
+        ])
+    elif u['newbie_status'] == 'pending':
+        rows.append([InlineKeyboardButton('⏳ Newbie Order Under Review', callback_data='status_info')])
+    elif u['wheel_status'] != 'used':
+        rows.append([
+            InlineKeyboardButton(
+                '🎡 Open Lucky Wheel',
+                web_app=WebAppInfo(wurl('/wheel', u['user_id'], 'wheel')),
+            )
+        ])
+
+    rows.extend([
+        [
+            InlineKeyboardButton('🎁 Rewards & Progress', callback_data='rewards'),
+            InlineKeyboardButton('💳 Withdrawal', callback_data='withdraw'),
+        ],
+        [InlineKeyboardButton('❓ Help & Support', callback_data='support')],
+    ])
+    return InlineKeyboardMarkup(rows)
+
 
 async def member_ok(ctx,chat_id,uid):
     try:
@@ -72,15 +195,57 @@ async def member_ok(ctx,chat_id,uid):
     except:return False
 
 async def start(update:Update,ctx:ContextTypes.DEFAULT_TYPE):
-    u=ensure(update.effective_user)
-    if u['blocked']: return await update.message.reply_text('Your account is blocked.')
-    await update.message.reply_text('🎉 <b>Welcome to Reward Team!</b>\n\nChannel aur Group join karke first Scratch Card unlock karein.',parse_mode=ParseMode.HTML,reply_markup=menu())
+    u = ensure(update.effective_user)
+    if u['blocked']:
+        return await update.message.reply_text(
+            '⛔ Your account is currently restricted. Please contact support.'
+        )
+
+    await update.message.reply_text(
+        dashboard_text(u),
+        parse_mode=ParseMode.HTML,
+        reply_markup=dashboard_keyboard(u),
+    )
+
 async def chatid(update:Update,ctx:ContextTypes.DEFAULT_TYPE):
     ch=update.effective_chat; await update.message.reply_text(f'🆔 Chat ID: <code>{ch.id}</code>\nType: {ch.type}',parse_mode=ParseMode.HTML)
 async def cancel(update:Update,ctx:ContextTypes.DEFAULT_TYPE): upd(update.effective_user.id,state=None); await update.message.reply_text('Cancelled.',reply_markup=menu())
 
 async def buttons(update:Update,ctx:ContextTypes.DEFAULT_TYPE):
     q=update.callback_query; await q.answer(); uid=q.from_user.id; u=ensure(q.from_user)
+    if q.data == 'main_menu':
+        u = user(uid)
+        return await q.message.reply_text(
+            dashboard_text(u),
+            parse_mode=ParseMode.HTML,
+            reply_markup=dashboard_keyboard(u),
+        )
+
+    if q.data == 'support':
+        return await q.message.reply_text(
+            '❓ <b>HELP & SUPPORT</b>\n\n'
+            '• Use only the task buttons shown in your dashboard.\n'
+            '• Upload clear and complete screenshots.\n'
+            '• Keep your Registration ID and Newbie Order ID ready.\n'
+            '• You will receive an automatic update after admin review.\n\n'
+            'Use /start anytime to return to your dashboard.',
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')]
+            ]),
+        )
+
+    if q.data == 'status_info':
+        return await q.message.reply_text(
+            '⏳ <b>SUBMISSION UNDER REVIEW</b>\n\n'
+            'Your proof is currently being checked by the admin.\n'
+            'You will receive an automatic message after approval or rejection.',
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')]
+            ]),
+        )
+
     if u['blocked']: return await q.message.reply_text('Your account is blocked.')
     if q.data=='verify':
         if not await member_ok(ctx,CHANNEL_ID,uid) or not await member_ok(ctx,GROUP_ID,uid):
@@ -166,14 +331,77 @@ async def buttons(update:Update,ctx:ContextTypes.DEFAULT_TYPE):
     if q.data=='newbie_upload':
         if user(uid)['second_status']!='used': return await q.message.reply_text('Pehle second Scratch Card complete karein.')
         upd(uid,state=WAIT_NEWBIE_PROOF); return await q.message.reply_text('📸 Newbie Order screenshot bhejein.')
-    if q.data=='rewards':
-        u=user(uid); return await q.message.reply_text(f"🎁 First: ₹{u['first_reward'] if u['first_status']=='used' else 0}\nSecond: ₹{u['second_reward'] if u['second_status']=='used' else 0}\nWheel: ₹{u['wheel_reward'] if u['wheel_status']=='used' else 0}\n\n💰 Balance: ₹{u['balance']}")
-    if q.data=='withdraw':
-        u=user(uid)
-        with db() as c:p=c.execute("SELECT * FROM withdrawals WHERE user_id=? AND status='pending'",(uid,)).fetchone()
-        if p:return await q.message.reply_text(f"⏳ Pending withdrawal ₹{p['amount']} to {p['upi_id']}")
-        if u['balance']<MIN_WITHDRAWAL:return await q.message.reply_text(f"Minimum withdrawal ₹{MIN_WITHDRAWAL}. Your balance ₹{u['balance']}")
-        upd(uid,state=WAIT_UPI); return await q.message.reply_text('Apni UPI ID bhejein, example: name@upi')
+    if q.data == 'rewards':
+        u = user(uid)
+        first_status = f"₹{u['first_reward']}" if u['first_status'] == 'used' else 'Locked'
+        second_status = f"₹{u['second_reward']}" if u['second_status'] == 'used' else 'Locked'
+        wheel_status = f"₹{u['wheel_reward']}" if u['wheel_status'] == 'used' else 'Locked'
+
+        await q.message.reply_text(
+            '🎁 <b>REWARD SUMMARY</b>\n\n'
+            f'Welcome Scratch          {first_status}\n'
+            f'Registration Scratch     {second_status}\n'
+            f'Lucky Wheel              {wheel_status}\n\n'
+            '━━━━━━━━━━━━━━\n'
+            f'Available Balance        ₹{u["balance"]}\n'
+            f'Minimum Withdrawal       ₹{MIN_WITHDRAWAL}\n'
+            '━━━━━━━━━━━━━━',
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('🎯 Continue Current Step', callback_data='main_menu')],
+                [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')],
+            ]),
+        )
+        return
+
+    if q.data == 'withdraw':
+        u = user(uid)
+        with db() as c:
+            pending = c.execute(
+                "SELECT * FROM withdrawals WHERE user_id=? AND status='pending' ORDER BY id DESC LIMIT 1",
+                (uid,),
+            ).fetchone()
+
+        if pending:
+            await q.message.reply_text(
+                '⏳ <b>WITHDRAWAL STATUS</b>\n\n'
+                f'Amount: ₹{pending["amount"]}\n'
+                f'UPI ID: {pending["upi_id"]}\n'
+                'Status: Pending Review',
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')]
+                ]),
+            )
+            return
+
+        if u['balance'] < MIN_WITHDRAWAL:
+            needed = MIN_WITHDRAWAL - u['balance']
+            await q.message.reply_text(
+                '💳 <b>WITHDRAWAL</b>\n\n'
+                f'Available Balance: ₹{u["balance"]}\n'
+                f'Minimum Withdrawal: ₹{MIN_WITHDRAWAL}\n\n'
+                f'You need ₹{needed} more to request a withdrawal.',
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton('🎯 Continue Tasks', callback_data='main_menu')],
+                    [InlineKeyboardButton('⬅️ Main Menu', callback_data='main_menu')],
+                ]),
+            )
+            return
+
+        upd(uid, state=WAIT_UPI)
+        await q.message.reply_text(
+            '💳 <b>REQUEST WITHDRAWAL</b>\n\n'
+            f'Available Balance: ₹{u["balance"]}\n\n'
+            'Send your UPI ID in this format:\n'
+            '<code>name@upi</code>',
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('❌ Cancel', callback_data='main_menu')]
+            ]),
+        )
+        return
 
 async def photos(update:Update,ctx:ContextTypes.DEFAULT_TYPE):
     u=ensure(update.effective_user); uid=u['user_id']; fid=update.message.photo[-1].file_id
