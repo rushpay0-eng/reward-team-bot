@@ -83,9 +83,83 @@ async def buttons(update:Update,ctx:ContextTypes.DEFAULT_TYPE):
     q=update.callback_query; await q.answer(); uid=q.from_user.id; u=ensure(q.from_user)
     if u['blocked']: return await q.message.reply_text('Your account is blocked.')
     if q.data=='verify':
-        if not await member_ok(ctx,CHANNEL_ID,uid) or not await member_ok(ctx,GROUP_ID,uid): return await q.message.reply_text('❌ Pehle Channel aur Group dono join karein.',reply_markup=menu())
-        upd(uid,verified=1,first_status='ready')
-        return await q.message.reply_text('✅ Verified! Ab proper Scratch Card kholen.',reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🎁 Open Scratch Card',web_app=WebAppInfo(wurl('/scratch/1',uid,'s1')))]]))
+        if not await member_ok(ctx,CHANNEL_ID,uid) or not await member_ok(ctx,GROUP_ID,uid):
+            return await q.message.reply_text(
+                '❌ Pehle Channel aur Group dono join karein.',
+                reply_markup=menu(),
+            )
+
+        upd(uid, verified=1)
+        u = user(uid)
+
+        # Never reset a completed scratch card back to ready.
+        if u['first_status'] == 'locked':
+            upd(uid, first_status='ready')
+            u = user(uid)
+
+        if u['first_status'] == 'ready':
+            return await q.message.reply_text(
+                '✅ Verified! Ab First Scratch Card kholen.',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton(
+                        '🎁 Open First Scratch Card',
+                        web_app=WebAppInfo(wurl('/scratch/1', uid, 's1')),
+                    )
+                ]]),
+            )
+
+        if u['registration_status'] in {'not_submitted', 'rejected'}:
+            return await q.message.reply_text(
+                '✅ First Scratch Card complete ho chuka hai.\n\n'
+                'Ab Registration complete karke Proof aur ID bhejein.',
+                reply_markup=reg_menu(),
+            )
+
+        if u['registration_status'] == 'pending':
+            return await q.message.reply_text(
+                '⏳ Registration proof Admin approval ke liye pending hai.'
+            )
+
+        if u['second_status'] == 'ready':
+            return await q.message.reply_text(
+                '✅ Registration approved! Second Scratch Card unlock hai.',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton(
+                        '🎁 Open Second Scratch Card',
+                        web_app=WebAppInfo(wurl('/scratch/2', uid, 's2')),
+                    )
+                ]]),
+            )
+
+        if u['second_status'] == 'used' and u['newbie_status'] in {'not_submitted', 'rejected'}:
+            return await q.message.reply_text(
+                '✅ Complete Newbie Order\n\n'
+                'Newbie Order complete karne ke baad:\n\n'
+                '📸 Upload Proof\n'
+                '🆔 Send Your ID',
+                reply_markup=newbie_menu(),
+            )
+
+        if u['newbie_status'] == 'pending':
+            return await q.message.reply_text(
+                '⏳ Newbie Order proof Admin approval ke liye pending hai.'
+            )
+
+        if u['wheel_status'] == 'ready':
+            return await q.message.reply_text(
+                '✅ Lucky Wheel unlock hai.',
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton(
+                        '🎡 Open Lucky Wheel',
+                        web_app=WebAppInfo(wurl('/wheel', uid, 'wheel')),
+                    )
+                ]]),
+            )
+
+        return await q.message.reply_text(
+            '✅ Aapke available steps complete ho chuke hain.',
+            reply_markup=menu(),
+        )
     if q.data=='reg_upload':
         if user(uid)['first_status']!='used': return await q.message.reply_text('Pehle first Scratch Card complete karein.')
         upd(uid,state=WAIT_REG_PROOF); return await q.message.reply_text('📸 Registration screenshot bhejein.')
@@ -135,20 +209,112 @@ def run_bot():
 def home():return 'Reward Bot Pro running',200
 @app.get('/scratch/<int:stage>')
 def scratch(stage):
-    purpose='s1' if stage==1 else 's2'; uid=verify_token(request.args.get('token',''),purpose)
-    if not uid:return 'Invalid link',403
-    u=user(uid)
-    if stage==1 and (not u or not u['verified']):return 'Locked',403
-    if stage==2 and u['registration_status']!='approved':return 'Locked',403
-    reward=u['first_reward'] if stage==1 else u['second_reward']
-    return render_template('scratch.html',stage=stage,reward=reward,token=request.args['token'])
+    if stage not in (1, 2):
+        return 'Invalid stage', 404
+
+    purpose = 's1' if stage == 1 else 's2'
+    uid = verify_token(request.args.get('token', ''), purpose)
+    if not uid:
+        return 'Invalid link', 403
+
+    u = user(uid)
+    if not u:
+        return 'User not found', 404
+
+    if stage == 1:
+        if not u['verified']:
+            return 'Membership verification required', 403
+        status = u['first_status']
+        reward = u['first_reward']
+    else:
+        if u['registration_status'] != 'approved':
+            return 'Registration approval required', 403
+        status = u['second_status']
+        reward = u['second_reward']
+
+    if status == 'locked':
+        return 'Scratch Card locked', 403
+
+    return render_template(
+        'scratch.html',
+        stage=stage,
+        reward=reward,
+        token=request.args['token'],
+        already_claimed=(status == 'used'),
+    )
+
+
 @app.post('/api/scratch')
 def scratch_api():
-    d=request.get_json() or {}; stage=int(d.get('stage',0)); purpose='s1' if stage==1 else 's2'; uid=verify_token(d.get('token',''),purpose)
-    if not uid:return jsonify(ok=False),403
-    u=user(uid); key='first' if stage==1 else 'second'; status=u[f'{key}_status']; reward=u[f'{key}_reward']
-    if status!='used': upd(uid,**{f'{key}_status':'used','balance':u['balance']+reward})
-    return jsonify(ok=True,reward=reward,next='Registration complete karke proof upload karein.' if stage==1 else 'Complete Newbie Order, then Upload Proof aur ID bhejein.')
+    d = request.get_json(silent=True) or {}
+    stage = int(d.get('stage', 0))
+    if stage not in (1, 2):
+        return jsonify(ok=False, error='Invalid stage'), 400
+
+    purpose = 's1' if stage == 1 else 's2'
+    uid = verify_token(d.get('token', ''), purpose)
+    if not uid:
+        return jsonify(ok=False, error='Invalid link'), 403
+
+    u = user(uid)
+    if not u:
+        return jsonify(ok=False, error='User not found'), 404
+
+    key = 'first' if stage == 1 else 'second'
+    status = u[f'{key}_status']
+    reward = u[f'{key}_reward']
+
+    if stage == 1 and not u['verified']:
+        return jsonify(ok=False, error='Membership verification required'), 403
+    if stage == 2 and u['registration_status'] != 'approved':
+        return jsonify(ok=False, error='Registration approval required'), 403
+    if status == 'locked':
+        return jsonify(ok=False, error='Scratch Card locked'), 403
+
+    if status == 'used':
+        return jsonify(
+            ok=True,
+            reward=reward,
+            already=True,
+            next=(
+                'Registration complete karke Proof aur ID bhejein.'
+                if stage == 1
+                else 'Complete Newbie Order, then Upload Proof aur ID bhejein.'
+            ),
+        )
+
+    upd(
+        uid,
+        **{
+            f'{key}_status': 'used',
+            'balance': u['balance'] + reward,
+        },
+    )
+
+    # Send the next required step directly in Telegram.
+    if stage == 1:
+        send_message(
+            uid,
+            '✅ First Scratch Reward balance me add ho gaya.\n\n'
+            'Ab Registration complete karke:\n'
+            '📸 Upload Proof\n'
+            '🆔 Send Registration ID',
+            reg_menu(),
+        )
+        next_text = 'Registration complete karke Proof aur ID bhejein.'
+    else:
+        send_message(
+            uid,
+            '✅ Second Scratch Reward balance me add ho gaya.\n\n'
+            '✅ Complete Newbie Order\n\n'
+            'Newbie Order complete karne ke baad:\n'
+            '📸 Upload Proof\n'
+            '🆔 Send Your ID',
+            newbie_menu(),
+        )
+        next_text = 'Complete Newbie Order, then Upload Proof aur ID bhejein.'
+
+    return jsonify(ok=True, reward=reward, already=False, next=next_text)
 @app.get('/wheel')
 def wheel():
     uid=verify_token(request.args.get('token',''),'wheel'); u=user(uid) if uid else None
