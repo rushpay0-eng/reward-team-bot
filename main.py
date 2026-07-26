@@ -115,6 +115,9 @@ DEFAULT_SETTINGS = {
     "registration_require_confirm": "1",
     "registration_button_text": "Continue Registration",
     "registration_target_link": "",
+    "registration_image_url": "",
+    "registration_extra_link_title": "",
+    "registration_extra_link_url": "",
 }
 
 
@@ -1565,6 +1568,15 @@ def registration_info_page():
             "Continue Registration",
         ),
         registration_link=current_registration_link(),
+        image_url=settings.get("registration_image_url", "").strip(),
+        extra_link_title=settings.get(
+            "registration_extra_link_title",
+            "",
+        ).strip(),
+        extra_link_url=settings.get(
+            "registration_extra_link_url",
+            "",
+        ).strip(),
     )
 
 
@@ -2192,6 +2204,18 @@ def save_registration_post():
         "registration_target_link",
         "",
     ).strip()
+    image_url = request.form.get(
+        "registration_image_url",
+        "",
+    ).strip()
+    extra_link_title = request.form.get(
+        "registration_extra_link_title",
+        "",
+    ).strip()
+    extra_link_url = request.form.get(
+        "registration_extra_link_url",
+        "",
+    ).strip()
     enabled = (
         "1"
         if request.form.get("registration_post_enabled") == "on"
@@ -2262,6 +2286,38 @@ def save_registration_post():
             )
         )
 
+    if image_url and not image_url.startswith(("https://", "http://")):
+        return redirect(
+            url_for(
+                "registration_post_admin",
+                post_error="Image URL must start with http:// or https://.",
+            )
+        )
+
+    if len(extra_link_title) > 80:
+        return redirect(
+            url_for(
+                "registration_post_admin",
+                post_error="Extra link title must be under 80 characters.",
+            )
+        )
+
+    if extra_link_url and not extra_link_url.startswith(("https://", "http://")):
+        return redirect(
+            url_for(
+                "registration_post_admin",
+                post_error="Extra link URL must start with http:// or https://.",
+            )
+        )
+
+    if bool(extra_link_title) != bool(extra_link_url):
+        return redirect(
+            url_for(
+                "registration_post_admin",
+                post_error="Enter both extra link title and extra link URL.",
+            )
+        )
+
     fields = {
         "registration_post_enabled": enabled,
         "registration_post_title": title,
@@ -2272,6 +2328,9 @@ def save_registration_post():
         "registration_require_confirm": require_confirm,
         "registration_button_text": button_text,
         "registration_target_link": target_link,
+        "registration_image_url": image_url,
+        "registration_extra_link_title": extra_link_title,
+        "registration_extra_link_url": extra_link_url,
     }
 
     with db() as conn:
