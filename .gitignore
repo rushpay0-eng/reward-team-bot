@@ -1,5 +1,5 @@
 .env
 __pycache__/
 *.pyc
-/data/
 reward_bot.db
+/data/
