@@ -1,0 +1,193 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+  >
+  <title>{{ title }}</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/registration.css">
+</head>
+<body>
+<main class="reading-page">
+  <header class="reading-header">
+    <div class="brand-label">UPI TASK REWARDS</div>
+    <h1>{{ title }}</h1>
+    {% if subtitle %}
+      <p>{{ subtitle }}</p>
+    {% endif %}
+  </header>
+
+  <section class="reading-status" aria-live="polite">
+    <div>
+      <span>Reading timer</span>
+      <strong id="timerValue">--:--</strong>
+    </div>
+    <div>
+      <span>Scroll progress</span>
+      <strong id="scrollValue">0%</strong>
+    </div>
+  </section>
+
+  <div class="progress-track" aria-hidden="true">
+    <div id="progressBar"></div>
+  </div>
+
+  <article id="postContent" class="post-content">{{ content }}</article>
+
+  <section class="completion-panel">
+    {% if require_confirm %}
+    <label class="confirmation">
+      <input id="confirmationBox" type="checkbox">
+      <span>I have read and understood the information above.</span>
+    </label>
+    {% endif %}
+
+    <p id="requirementMessage">
+      Complete the reading timer{% if require_scroll %}, scroll to the end{% endif %}{% if require_confirm %}, and confirm that you understand{% endif %}.
+    </p>
+
+    <a
+      id="continueButton"
+      class="continue-button locked"
+      href="#"
+      aria-disabled="true"
+    >
+      🔒 {{ button_text }}
+    </a>
+
+    <button id="returnButton" class="return-button" type="button">
+      ⬅️ Return to Bot
+    </button>
+  </section>
+</main>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const initialSeconds = {{ reading_seconds }};
+const requireScroll = {{ "true" if require_scroll else "false" }};
+const requireConfirm = {{ "true" if require_confirm else "false" }};
+const targetLink = {{ registration_link | tojson }};
+
+const timerValue = document.getElementById("timerValue");
+const scrollValue = document.getElementById("scrollValue");
+const progressBar = document.getElementById("progressBar");
+const continueButton = document.getElementById("continueButton");
+const confirmationBox = document.getElementById("confirmationBox");
+const requirementMessage = document.getElementById("requirementMessage");
+
+let remaining = initialSeconds;
+let timerComplete = remaining <= 0;
+let scrollComplete = !requireScroll;
+let confirmed = !requireConfirm;
+let pageVisible = !document.hidden;
+let intervalId = null;
+
+function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function updateTimer() {
+  timerValue.textContent = timerComplete ? "Completed" : formatTime(remaining);
+}
+
+function updateScroll() {
+  const documentHeight = Math.max(
+    document.documentElement.scrollHeight - window.innerHeight,
+    1
+  );
+  const percent = Math.min(
+    100,
+    Math.max(0, Math.round((window.scrollY / documentHeight) * 100))
+  );
+
+  scrollValue.textContent = `${percent}%`;
+  progressBar.style.width = `${percent}%`;
+
+  if (!requireScroll || percent >= 95) {
+    scrollComplete = true;
+  }
+  updateButton();
+}
+
+function updateButton() {
+  confirmed = !requireConfirm || Boolean(confirmationBox && confirmationBox.checked);
+  const unlocked = timerComplete && scrollComplete && confirmed;
+
+  if (unlocked) {
+    continueButton.classList.remove("locked");
+    continueButton.classList.add("unlocked");
+    continueButton.removeAttribute("aria-disabled");
+    continueButton.href = targetLink;
+    continueButton.textContent = "🌐 {{ button_text }}";
+    requirementMessage.textContent =
+      "✅ Reading requirements completed. You may continue registration.";
+  } else {
+    continueButton.classList.add("locked");
+    continueButton.classList.remove("unlocked");
+    continueButton.href = "#";
+    continueButton.setAttribute("aria-disabled", "true");
+
+    const pending = [];
+    if (!timerComplete) pending.push("timer");
+    if (!scrollComplete) pending.push("full scroll");
+    if (!confirmed) pending.push("confirmation");
+    requirementMessage.textContent =
+      `Still required: ${pending.join(", ")}.`;
+  }
+}
+
+function beginTimer() {
+  if (intervalId || timerComplete) return;
+
+  intervalId = window.setInterval(() => {
+    if (!pageVisible || timerComplete) return;
+
+    remaining -= 1;
+    if (remaining <= 0) {
+      remaining = 0;
+      timerComplete = true;
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+    updateTimer();
+    updateButton();
+  }, 1000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  pageVisible = !document.hidden;
+});
+
+window.addEventListener("scroll", updateScroll, {passive: true});
+window.addEventListener("resize", updateScroll);
+
+if (confirmationBox) {
+  confirmationBox.addEventListener("change", updateButton);
+}
+
+continueButton.addEventListener("click", event => {
+  if (continueButton.classList.contains("locked")) {
+    event.preventDefault();
+    tg.HapticFeedback.notificationOccurred("warning");
+  }
+});
+
+document.getElementById("returnButton").addEventListener("click", () => {
+  tg.close();
+});
+
+updateTimer();
+updateScroll();
+updateButton();
+beginTimer();
+</script>
+</body>
+</html>

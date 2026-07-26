@@ -1,6 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reward Bot Admin</title><link rel="stylesheet" href="/static/admin.css"></head><body>
 <header class="topbar"><div><b>Reward Bot Admin</b><small>Professional Control Centre</small></div><a href="/admin/logout">Logout</a></header>
-<nav class="nav"><a href="#dash">Dashboard</a><a href="#reg">Registration</a><a href="#newbie">Newbie</a><a href="#wd">Withdrawals</a><a href="#amounts">Update Amounts</a><a href="#users">Users</a><a href="#activity">Activity</a></nav>
+<nav class="nav"><a href="#dash">Dashboard</a><a href="#reg">Registration</a><a href="#newbie">Newbie</a><a href="#wd">Withdrawals</a><a href="#registration-post">Registration Post</a>
+  <a href="#amounts">Update Amounts</a><a href="#users">Users</a><a href="#activity">Activity</a></nav>
 <main class="container">
 {% if request.args.get('settings_saved') %}<div class="alert success">Settings saved.</div>{% endif %}{% if request.args.get('settings_error') %}<div class="alert error">{{ request.args.get('settings_error') }}</div>{% endif %}
 <section id="dash" class="panel hero"><div class="heading"><div><span>LIVE OVERVIEW</span><h1>Admin Dashboard</h1><p>Important information is visible without opening long tables.</p></div></div><div class="metrics">
