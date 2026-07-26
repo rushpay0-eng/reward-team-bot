@@ -126,7 +126,7 @@ claimButton.onclick = async () => {
 
     claimButton.textContent = data.already ? 'Already Claimed' : 'Reward Claimed';
     document.getElementById('resultBox').innerHTML =
-      `<div class="success">✅ ₹${data.reward} has been added to your balance.<br>Tap Return to Bot to continue.</div>`;
+      `<div class="success">✅ ₹${data.reward} has been added to your balance.<br>Your updated dashboard has been sent to the bot. Tap Return to Bot to continue.</div>`;
     tg.HapticFeedback.notificationOccurred('success');
   } catch (error) {
     claimButton.disabled = false;

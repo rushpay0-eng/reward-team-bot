@@ -119,7 +119,7 @@ spinButton.onclick = async () => {
       } else {
         spinButton.textContent = 'Completed';
         document.getElementById('resultBox').innerHTML =
-          `<div class="success">🎉 You won ₹${data.reward}.<br>Tap Return to Bot to continue.</div>`;
+          `<div class="success">🎉 You won ₹${data.reward}.<br>Your updated dashboard has been sent to the bot. Tap Return to Bot to continue.</div>`;
         tg.HapticFeedback.notificationOccurred('success');
       }
     }
