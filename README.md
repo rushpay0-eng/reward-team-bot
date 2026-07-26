@@ -1,22 +1,67 @@
-# Reward Bot Pro
+# Reward Bot Complete Pro
 
-Features:
-- Real finger scratch card Mini App
-- Animated Lucky Wheel Mini App
-- Channel/group verification
-- Registration and Newbie Order proof upload
-- Web Admin Panel
-- Withdrawal requests
-- Railway Volume-ready SQLite database
-- /chatid command
+Professional Telegram reward bot with:
 
-Railway:
-1. Upload all files to GitHub.
-2. Deploy repository on Railway.
-3. Generate a Railway HTTPS domain.
-4. Put that domain in PUBLIC_URL.
-5. Add variables from .env.example.
-6. Attach a Railway Volume at /data.
-7. Redeploy.
+- Dynamic single-dashboard navigation
+- Back to Dashboard on every user screen
+- Real Scratch Cards and Lucky Wheel
+- Registration and Newbie proof review
+- Secure proof image preview in Admin Panel
+- 24-hour admin analytics and activity log
+- Complete withdrawal history
+- Admin-controlled reward settings
+- Daily Check-in bonus
+- Atomic duplicate-claim protection
+- Railway Volume-ready database
 
-Admin panel: https://YOUR-DOMAIN.up.railway.app/admin
+## Required GitHub structure
+
+main.py
+requirements.txt
+Procfile
+.env.example
+.gitignore
+README.md
+
+templates/
+  scratch.html
+  wheel.html
+  login.html
+  admin.html
+
+static/
+  miniapp.css
+  admin.css
+
+## Railway
+
+Start command:
+
+python main.py
+
+Public Network port:
+
+8080
+
+Attach a Volume at:
+
+/data
+
+Admin Panel:
+
+https://YOUR-DOMAIN.up.railway.app/admin
+
+
+## 3-Level Referral System
+
+Railway variable required:
+
+BOT_USERNAME=YourBotUsername
+
+Default commission rates:
+
+- Level 1: 0.3%
+- Level 2: 0.2%
+- Level 3: 0.1%
+
+Referral commission applies to First Scratch, Second Scratch, Lucky Wheel and Daily Check-in rewards.
