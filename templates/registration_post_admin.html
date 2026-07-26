@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Registration Post Editor</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <b>Reward Bot Admin</b>
+    <small>Registration Post Editor</small>
+  </div>
+  <a href="/admin">← Dashboard</a>
+</header>
+
+<main class="container">
+  {% if request.args.get('post_saved') %}
+    <div class="alert success">Registration post saved successfully.</div>
+  {% endif %}
+  {% if request.args.get('post_error') %}
+    <div class="alert error">{{ request.args.get('post_error') }}</div>
+  {% endif %}
+
+  <section class="panel">
+    <div class="heading">
+      <div>
+        <span>CONTENT MANAGEMENT</span>
+        <h1>Registration Post Editor</h1>
+        <p>Create, edit and publish the information users must read before registration.</p>
+      </div>
+      <em>{{ 'Published' if settings.registration_post_enabled == '1' else 'Unpublished' }}</em>
+    </div>
+
+    <form method="post" action="/admin/registration-post" class="registration-editor-form">
+      <div class="registration-editor-main">
+        <label>
+          Post Title
+          <input
+            name="registration_post_title"
+            maxlength="150"
+            value="{{ settings.registration_post_title }}"
+            required
+          >
+        </label>
+
+        <label>
+          Short Subtitle
+          <input
+            name="registration_post_subtitle"
+            maxlength="300"
+            value="{{ settings.registration_post_subtitle }}"
+          >
+        </label>
+
+        <label>
+          Full Registration Post
+          <textarea
+            name="registration_post_content"
+            maxlength="50000"
+            rows="24"
+            required
+          >{{ settings.registration_post_content }}</textarea>
+          <small>You can write around 2,000 words. Paragraphs and line breaks will remain visible.</small>
+        </label>
+      </div>
+
+      <aside class="registration-editor-controls">
+        <h3>Reading Controls</h3>
+
+        <label class="editor-toggle">
+          <span>
+            <b>Publish Post</b>
+            <small>When OFF, the external registration link opens directly.</small>
+          </span>
+          <input
+            type="checkbox"
+            name="registration_post_enabled"
+            {% if settings.registration_post_enabled == '1' %}checked{% endif %}
+          >
+        </label>
+
+        <label>
+          Reading Timer (seconds)
+          <input
+            type="number"
+            name="registration_read_seconds"
+            min="0"
+            max="3600"
+            value="{{ settings.registration_read_seconds }}"
+            required
+          >
+        </label>
+
+        <label class="editor-toggle">
+          <span>
+            <b>Require Full Scroll</b>
+            <small>User must reach the end of the post.</small>
+          </span>
+          <input
+            type="checkbox"
+            name="registration_require_scroll"
+            {% if settings.registration_require_scroll == '1' %}checked{% endif %}
+          >
+        </label>
+
+        <label class="editor-toggle">
+          <span>
+            <b>Require Confirmation</b>
+            <small>User must tick “I have read and understood”.</small>
+          </span>
+          <input
+            type="checkbox"
+            name="registration_require_confirm"
+            {% if settings.registration_require_confirm == '1' %}checked{% endif %}
+          >
+        </label>
+
+        <label>
+          Continue Button Text
+          <input
+            name="registration_button_text"
+            maxlength="60"
+            value="{{ settings.registration_button_text }}"
+            required
+          >
+        </label>
+
+        <label>
+          Registration Link
+          <input
+            type="url"
+            name="registration_target_link"
+            value="{{ settings.registration_target_link }}"
+            placeholder="Leave blank to use Railway REGISTRATION_LINK"
+          >
+        </label>
+
+        <button class="save" type="submit">
+          Save & Publish Registration Post
+        </button>
+
+        <a class="editor-back-link" href="/admin">Back to Admin Dashboard</a>
+      </aside>
+    </form>
+  </section>
+</main>
+</body>
+</html>
