@@ -1,0 +1,15 @@
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:Arial,sans-serif;background:radial-gradient(circle at top,#263b8e,#11172f 68%);color:#fff}
+.mini-page{max-width:440px;margin:auto;padding:26px 18px;text-align:center}
+.mini-brand{font-size:12px;font-weight:800;letter-spacing:3px;color:#ffd55c}
+h1{font-size:31px;margin:14px 0 7px}.muted{color:#c8cde0;line-height:1.5}
+.scratch-card{position:relative;height:225px;margin:26px 0;border-radius:24px;overflow:hidden;border:4px solid #ffd55c;box-shadow:0 18px 50px #0008}
+.prize-panel{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(135deg,#6e39ce,#277df2)}
+.prize-panel span{letter-spacing:3px}.prize-panel strong{font-size:64px;margin:7px}.prize-panel small{font-size:15px}
+#scratchCanvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.primary,.secondary{width:100%;padding:16px;border:0;border-radius:14px;font-size:17px;font-weight:800;margin-top:12px}
+.primary{background:linear-gradient(90deg,#ffd33d,#ff9d20);color:#1c1c1c}.primary:disabled{opacity:.55}
+.secondary{background:#ffffff17;color:#fff;border:1px solid #ffffff50}
+.success,.error{padding:16px;border-radius:13px;margin-top:16px;line-height:1.5}.success{background:#179c72}.error{background:#b83c45}
+.wheel-wrap{position:relative;max-width:360px;margin:22px auto}.wheel-wrap canvas{width:100%;filter:drop-shadow(0 15px 25px #0008)}
+.pointer{position:absolute;z-index:2;top:-22px;left:50%;transform:translateX(-50%);font-size:48px;text-shadow:0 4px 7px #000}
