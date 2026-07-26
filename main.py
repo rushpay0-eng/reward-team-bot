@@ -2169,6 +2169,15 @@ def review_withdrawal(withdrawal_id: int, action: str):
     return redirect(url_for("admin_dashboard"))
 
 
+@app.get("/admin/registration-post")
+@admin_required
+def registration_post_admin():
+    return render_template(
+        "registration_post_admin.html",
+        settings=get_settings(),
+    )
+
+
 @app.post("/admin/registration-post")
 @admin_required
 def save_registration_post():
@@ -2208,7 +2217,7 @@ def save_registration_post():
     except ValueError:
         return redirect(
             url_for(
-                "admin_dashboard",
+                "registration_post_admin",
                 post_error="Timer must be between 0 and 3600 seconds.",
             )
         )
@@ -2216,7 +2225,7 @@ def save_registration_post():
     if not title or len(title) > 150:
         return redirect(
             url_for(
-                "admin_dashboard",
+                "registration_post_admin",
                 post_error="Post title is required and must be under 150 characters.",
             )
         )
@@ -2224,7 +2233,7 @@ def save_registration_post():
     if len(subtitle) > 300:
         return redirect(
             url_for(
-                "admin_dashboard",
+                "registration_post_admin",
                 post_error="Subtitle must be under 300 characters.",
             )
         )
@@ -2232,7 +2241,7 @@ def save_registration_post():
     if not content or len(content) > 50000:
         return redirect(
             url_for(
-                "admin_dashboard",
+                "registration_post_admin",
                 post_error="Post content is required and must be under 50,000 characters.",
             )
         )
@@ -2240,7 +2249,7 @@ def save_registration_post():
     if not button_text or len(button_text) > 60:
         return redirect(
             url_for(
-                "admin_dashboard",
+                "registration_post_admin",
                 post_error="Button text is required and must be under 60 characters.",
             )
         )
@@ -2248,7 +2257,7 @@ def save_registration_post():
     if target_link and not target_link.startswith(("https://", "http://")):
         return redirect(
             url_for(
-                "admin_dashboard",
+                "registration_post_admin",
                 post_error="Registration link must start with http:// or https://.",
             )
         )
@@ -2285,7 +2294,7 @@ def save_registration_post():
     )
     return redirect(
         url_for(
-            "admin_dashboard",
+            "registration_post_admin",
             post_saved="1",
         )
     )
