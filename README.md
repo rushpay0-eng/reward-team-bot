@@ -80,3 +80,21 @@ Referral commission applies to First Scratch, Second Scratch, Lucky Wheel and Da
 - Detailed Level 1/2/3 referral activity.
 - Separate Registration, Newbie and Withdrawal sections.
 - Compact dashboard metrics and central Update Amounts section.
+
+
+## Registration Post and Reading Timer
+
+The Admin Panel now includes a separate `Registration Post` section.
+
+Admin can control:
+
+- Post title and subtitle
+- Long registration content up to 50,000 characters
+- Reading timer from 0 to 3,600 seconds
+- Required full-page scroll
+- Required “I have read and understood” confirmation
+- Continue button text
+- Registration target link
+- Publish/unpublish switch
+
+The content is stored in the existing persistent SQLite database. No new Railway variable is required. If the Admin Panel registration link is blank, the existing `REGISTRATION_LINK` Railway variable is used.

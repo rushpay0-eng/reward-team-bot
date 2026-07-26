@@ -106,6 +106,15 @@ DEFAULT_SETTINGS = {
     "referral_level2": "0.2",
     "referral_level3": "0.1",
     "rewards_enabled": "1",
+    "registration_post_enabled": "1",
+    "registration_post_title": "Complete Registration Guide",
+    "registration_post_subtitle": "Read the complete information carefully before continuing.",
+    "registration_post_content": "Add your complete registration instructions from the Admin Panel.",
+    "registration_read_seconds": "90",
+    "registration_require_scroll": "1",
+    "registration_require_confirm": "1",
+    "registration_button_text": "Continue Registration",
+    "registration_target_link": "",
 }
 
 
@@ -522,6 +531,11 @@ def referral_summary(user_id: int) -> dict:
     }
 
 
+def current_registration_link() -> str:
+    saved_link = get_settings().get("registration_target_link", "").strip()
+    return saved_link or REGISTRATION_LINK
+
+
 def signed_token(user_id: int, purpose: str) -> str:
     raw = f"{user_id}:{purpose}"
     signature = hmac.new(
@@ -674,7 +688,14 @@ def dashboard_keyboard(user: sqlite3.Row) -> InlineKeyboardMarkup:
             [
                 [
                     InlineKeyboardButton(
-                        "🌐 Complete Registration", url=REGISTRATION_LINK
+                        "📖 Complete Registration",
+                        web_app=WebAppInfo(
+                            web_url(
+                                "/registration-info",
+                                user["user_id"],
+                                "registration_info",
+                            )
+                        ),
                     )
                 ],
                 [
@@ -1485,6 +1506,68 @@ def assign_scratch_reward(user_id: int, stage: int) -> int:
     return reward
 
 
+@app.get("/registration-info")
+def registration_info_page():
+    user_id = verify_token(
+        request.args.get("token", ""),
+        "registration_info",
+    )
+    if not user_id:
+        return "Invalid or expired registration page link", 403
+
+    user = get_user(user_id)
+    if not user or user["blocked"]:
+        return "User account is unavailable", 403
+
+    if not user["verified"] or user["first_status"] != "used":
+        return "Complete membership verification and Welcome Scratch first.", 403
+
+    if user["registration_status"] not in {"not_submitted", "rejected"}:
+        return "Registration information is not required at this stage.", 403
+
+    settings = get_settings()
+    if settings.get("registration_post_enabled", "1") != "1":
+        return redirect(current_registration_link())
+
+    try:
+        reading_seconds = max(
+            0,
+            min(3600, int(settings.get("registration_read_seconds", "90"))),
+        )
+    except ValueError:
+        reading_seconds = 90
+
+    return render_template(
+        "registration_info.html",
+        title=settings.get(
+            "registration_post_title",
+            "Complete Registration Guide",
+        ),
+        subtitle=settings.get(
+            "registration_post_subtitle",
+            "",
+        ),
+        content=settings.get(
+            "registration_post_content",
+            "",
+        ),
+        reading_seconds=reading_seconds,
+        require_scroll=settings.get(
+            "registration_require_scroll",
+            "1",
+        ) == "1",
+        require_confirm=settings.get(
+            "registration_require_confirm",
+            "1",
+        ) == "1",
+        button_text=settings.get(
+            "registration_button_text",
+            "Continue Registration",
+        ),
+        registration_link=current_registration_link(),
+    )
+
+
 @app.get("/scratch/<int:stage>")
 def scratch_page(stage: int):
     if stage not in (1, 2):
@@ -2084,6 +2167,128 @@ def review_withdrawal(withdrawal_id: int, action: str):
         ),
     )
     return redirect(url_for("admin_dashboard"))
+
+
+@app.post("/admin/registration-post")
+@admin_required
+def save_registration_post():
+    title = request.form.get("registration_post_title", "").strip()
+    subtitle = request.form.get("registration_post_subtitle", "").strip()
+    content = request.form.get("registration_post_content", "").strip()
+    button_text = request.form.get(
+        "registration_button_text",
+        "",
+    ).strip()
+    target_link = request.form.get(
+        "registration_target_link",
+        "",
+    ).strip()
+    enabled = (
+        "1"
+        if request.form.get("registration_post_enabled") == "on"
+        else "0"
+    )
+    require_scroll = (
+        "1"
+        if request.form.get("registration_require_scroll") == "on"
+        else "0"
+    )
+    require_confirm = (
+        "1"
+        if request.form.get("registration_require_confirm") == "on"
+        else "0"
+    )
+
+    try:
+        reading_seconds = int(
+            request.form.get("registration_read_seconds", "90")
+        )
+        if reading_seconds < 0 or reading_seconds > 3600:
+            raise ValueError
+    except ValueError:
+        return redirect(
+            url_for(
+                "admin_dashboard",
+                post_error="Timer must be between 0 and 3600 seconds.",
+            )
+        )
+
+    if not title or len(title) > 150:
+        return redirect(
+            url_for(
+                "admin_dashboard",
+                post_error="Post title is required and must be under 150 characters.",
+            )
+        )
+
+    if len(subtitle) > 300:
+        return redirect(
+            url_for(
+                "admin_dashboard",
+                post_error="Subtitle must be under 300 characters.",
+            )
+        )
+
+    if not content or len(content) > 50000:
+        return redirect(
+            url_for(
+                "admin_dashboard",
+                post_error="Post content is required and must be under 50,000 characters.",
+            )
+        )
+
+    if not button_text or len(button_text) > 60:
+        return redirect(
+            url_for(
+                "admin_dashboard",
+                post_error="Button text is required and must be under 60 characters.",
+            )
+        )
+
+    if target_link and not target_link.startswith(("https://", "http://")):
+        return redirect(
+            url_for(
+                "admin_dashboard",
+                post_error="Registration link must start with http:// or https://.",
+            )
+        )
+
+    fields = {
+        "registration_post_enabled": enabled,
+        "registration_post_title": title,
+        "registration_post_subtitle": subtitle,
+        "registration_post_content": content,
+        "registration_read_seconds": str(reading_seconds),
+        "registration_require_scroll": require_scroll,
+        "registration_require_confirm": require_confirm,
+        "registration_button_text": button_text,
+        "registration_target_link": target_link,
+    }
+
+    with db() as conn:
+        for key, value in fields.items():
+            conn.execute(
+                """
+                INSERT INTO settings(key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value=excluded.value,
+                    updated_at=excluded.updated_at
+                """,
+                (key, value, now_iso()),
+            )
+
+    log_activity(
+        "registration_post_updated",
+        None,
+        f"Timer: {reading_seconds}s",
+    )
+    return redirect(
+        url_for(
+            "admin_dashboard",
+            post_saved="1",
+        )
+    )
 
 
 @app.post("/admin/settings")
