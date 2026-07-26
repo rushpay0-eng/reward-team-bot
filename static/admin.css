@@ -44,3 +44,75 @@
   .post-editor-form{grid-template-columns:1fr}
   .editor-main textarea{min-height:360px}
 }
+
+.registration-editor-form{
+  display:grid;
+  grid-template-columns:minmax(0,2fr) minmax(280px,1fr);
+  gap:18px;
+}
+.registration-editor-main,
+.registration-editor-controls{
+  border:1px solid #e1e6ef;
+  border-radius:14px;
+  padding:18px;
+  background:#f8fafe;
+}
+.registration-editor-main label,
+.registration-editor-controls label{
+  display:block;
+  color:#596579;
+  font-size:14px;
+  margin-top:14px;
+}
+.registration-editor-main label:first-child,
+.registration-editor-controls label:first-child{
+  margin-top:0;
+}
+.registration-editor-main textarea{
+  width:100%;
+  min-height:470px;
+  resize:vertical;
+  margin-top:7px;
+  border:1px solid #cbd3e1;
+  border-radius:10px;
+  padding:14px;
+  background:#fff;
+  font:inherit;
+  line-height:1.6;
+}
+.registration-editor-main small,
+.registration-editor-controls small{
+  display:block;
+  color:#8892a5;
+  margin-top:5px;
+}
+.editor-toggle{
+  display:flex!important;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px;
+  background:#fff;
+  border-radius:10px;
+}
+.editor-toggle input{
+  width:22px;
+  height:22px;
+  flex:0 0 auto;
+}
+.registration-editor-controls .save{
+  width:100%;
+  margin-top:18px;
+}
+.editor-back-link{
+  display:block;
+  text-align:center;
+  margin-top:12px;
+  color:#304fc3;
+  text-decoration:none;
+  font-weight:700;
+}
+@media(max-width:850px){
+  .registration-editor-form{grid-template-columns:1fr}
+  .registration-editor-main textarea{min-height:380px}
+}
