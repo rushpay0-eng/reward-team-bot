@@ -130,3 +130,30 @@ body{
   .reading-header h1{font-size:24px}
   .post-content{padding:18px 15px}
 }
+
+.registration-media{
+  margin:14px 0;
+  overflow:hidden;
+  border:1px solid #e1e6ef;
+  border-radius:17px;
+  background:#fff;
+}
+.registration-media img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:520px;
+  object-fit:contain;
+}
+.extra-resource-link{
+  display:block;
+  margin-top:14px;
+  padding:14px 16px;
+  border:1px solid #ccd5eb;
+  border-radius:12px;
+  background:#eef2ff;
+  color:#263d9c;
+  text-align:center;
+  text-decoration:none;
+  font-weight:800;
+}
