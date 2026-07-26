@@ -35,7 +35,24 @@
     <div id="progressBar"></div>
   </div>
 
+  {% if image_url %}
+  <figure class="registration-media">
+    <img src="{{ image_url }}" alt="Registration information image">
+  </figure>
+  {% endif %}
+
   <article id="postContent" class="post-content">{{ content }}</article>
+
+  {% if extra_link_url and extra_link_title %}
+  <a
+    class="extra-resource-link"
+    href="{{ extra_link_url }}"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    🔗 {{ extra_link_title }}
+  </a>
+  {% endif %}
 
   <section class="completion-panel">
     {% if require_confirm %}

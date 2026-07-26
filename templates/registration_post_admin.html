@@ -128,6 +128,38 @@
         </label>
 
         <label>
+          Image URL (Optional)
+          <input
+            type="url"
+            name="registration_image_url"
+            value="{{ settings.registration_image_url }}"
+            placeholder="https://example.com/image.jpg"
+          >
+          <small>Use a direct HTTPS image link ending in .jpg, .png or .webp.</small>
+        </label>
+
+        <label>
+          Extra Link Button Title (Optional)
+          <input
+            name="registration_extra_link_title"
+            maxlength="80"
+            value="{{ settings.registration_extra_link_title }}"
+            placeholder="Watch Tutorial"
+          >
+        </label>
+
+        <label>
+          Extra Link URL (Optional)
+          <input
+            type="url"
+            name="registration_extra_link_url"
+            value="{{ settings.registration_extra_link_url }}"
+            placeholder="https://youtube.com/..."
+          >
+          <small>You can use a YouTube, Telegram post or website link.</small>
+        </label>
+
+        <label>
           Registration Link
           <input
             type="url"
