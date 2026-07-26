@@ -545,6 +545,40 @@ def web_url(path: str, user_id: int, purpose: str) -> str:
     return f"{PUBLIC_URL}{path}?token={quote(signed_token(user_id, purpose))}"
 
 
+
+def live_membership_verified(user_id: int) -> bool:
+    """Check current Channel and Group membership directly through Telegram API."""
+    if not CHANNEL_ID or not GROUP_ID:
+        return False
+
+    allowed = {"member", "administrator", "creator", "restricted"}
+
+    for chat_id in (CHANNEL_ID, GROUP_ID):
+        try:
+            response = requests.get(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember",
+                params={"chat_id": chat_id, "user_id": user_id},
+                timeout=12,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not payload.get("ok"):
+                return False
+            status = payload.get("result", {}).get("status")
+            if status not in allowed:
+                return False
+        except Exception as exc:
+            logger.warning(
+                "Live membership verification failed for user %s in %s: %s",
+                user_id,
+                chat_id,
+                exc,
+            )
+            return False
+
+    return True
+
+
 def progress_info(user: sqlite3.Row) -> tuple[int, str]:
     completed = sum(
         [
@@ -584,15 +618,25 @@ def dashboard_text(user: sqlite3.Row) -> str:
         if user["last_checkin_date"] == local_date_key()
         else "Available"
     )
+    task_balance = float(user["balance"] or 0)
+    referral_balance = float(user["referral_balance"] or 0)
+    referral_earnings = float(user["referral_earnings"] or 0)
+    total_available = task_balance + referral_balance
+
     return (
-        "🎁 <b>UPI TASK REWARDS</b>\n\n"
+        "🎁 <b>UPI TASK REWARDS</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
         f"Hello {user['first_name'] or 'User'} 👋\n\n"
-        f"<b>Progress:</b> {completed}/3 completed\n"
-        f"<b>Current Step:</b> {current}\n\n"
-        f"💰 <b>Task Balance:</b> ₹{user['balance']}\n"
-        f"👥 <b>Referral Balance:</b> ₹{format_money(float(user['referral_balance'] or 0))}\n"
+        f"📊 <b>Progress:</b> {completed}/3 completed\n"
+        f"🎯 <b>Current Step:</b> {current}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 <b>Task Balance:</b> ₹{format_money(task_balance)}\n"
+        f"👥 <b>Referral Balance:</b> ₹{format_money(referral_balance)}\n"
+        f"🏆 <b>Total Referral Earnings:</b> ₹{format_money(referral_earnings)}\n"
+        f"💵 <b>Total Available:</b> ₹{format_money(total_available)}\n"
         f"💳 <b>Minimum Withdrawal:</b> ₹{settings['minimum_withdrawal']}\n"
-        f"📅 <b>Daily Bonus:</b> {daily_status}"
+        f"📅 <b>Daily Bonus:</b> {daily_status}\n"
+        "━━━━━━━━━━━━━━━━━━━━"
     )
 
 
@@ -604,7 +648,7 @@ def dashboard_keyboard(user: sqlite3.Row) -> InlineKeyboardMarkup:
             [
                 [
                     InlineKeyboardButton("📢 Official Channel", url=CHANNEL_LINK),
-                    InlineKeyboardButton("👥 Community Group", url=GROUP_LINK),
+                    InlineKeyboardButton("👥 Join Community", url=GROUP_LINK),
                 ],
                 [
                     InlineKeyboardButton(
@@ -854,7 +898,7 @@ async def callback_handler(
             await edit_or_send(
                 query,
                 "❌ <b>MEMBERSHIP NOT VERIFIED</b>\n\n"
-                "Please join both the Official Channel and Community Group, "
+                "Please join both the Official Channel and Join Community group, "
                 "then tap Verify Membership again.",
                 dashboard_keyboard(user),
             )
@@ -1432,8 +1476,12 @@ def scratch_page(stage: int):
         return "User not found", 404
 
     if stage == 1:
-        if not user["verified"] or user["first_status"] == "locked":
-            return "Scratch Card locked", 403
+        if (
+            not user["verified"]
+            or user["first_status"] == "locked"
+            or not live_membership_verified(user_id)
+        ):
+            return "Join the Official Channel and Community before opening the Scratch Card.", 403
         status = user["first_status"]
     else:
         if (
@@ -1475,9 +1523,14 @@ def scratch_claim():
             "SELECT * FROM users WHERE user_id=?", (user_id,)
         ).fetchone()
 
-        if stage == 1 and not user["verified"]:
+        if stage == 1 and (
+            not user["verified"] or not live_membership_verified(user_id)
+        ):
             conn.rollback()
-            return jsonify(ok=False, error="Membership verification required"), 403
+            return jsonify(
+                ok=False,
+                error="Join the Official Channel and Community before claiming."
+            ), 403
         if stage == 2 and user["registration_status"] != "approved":
             conn.rollback()
             return jsonify(ok=False, error="Registration approval required"), 403
