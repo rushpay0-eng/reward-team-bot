@@ -105,6 +105,7 @@ DEFAULT_SETTINGS = {
     "referral_level1": "0.3",
     "referral_level2": "0.2",
     "referral_level3": "0.1",
+    "rewards_enabled": "1",
 }
 
 
@@ -1107,26 +1108,49 @@ async def callback_handler(
 
     if query.data == "activity":
         with db() as conn:
-            transactions = conn.execute(
-                """
-                SELECT * FROM transactions
-                WHERE user_id=?
-                ORDER BY id DESC LIMIT 8
-                """,
-                (user_id,),
-            ).fetchall()
-        if transactions:
-            lines = []
-            for item in transactions:
-                sign = "+" if item["amount"] >= 0 else ""
-                label = item["kind"].replace("_", " ").title()
-                lines.append(f"• {label}: {sign}₹{item['amount']}")
-            body = "\n".join(lines)
-        else:
-            body = "No reward or withdrawal activity yet."
+            tx = conn.execute("SELECT * FROM transactions WHERE user_id=? ORDER BY id DESC LIMIT 12", (user_id,)).fetchall()
+            refs = conn.execute("""
+                SELECT rc.*, u.first_name, u.username
+                FROM referral_commissions rc
+                LEFT JOIN users u ON u.user_id=rc.source_user_id
+                WHERE rc.beneficiary_user_id=?
+                ORDER BY rc.id DESC LIMIT 12
+            """, (user_id,)).fetchall()
+            sums = conn.execute("""
+                SELECT level, COALESCE(SUM(commission_amount),0) total
+                FROM referral_commissions
+                WHERE beneficiary_user_id=? GROUP BY level
+            """, (user_id,)).fetchall()
+
+        normal=[]
+        for item in tx:
+            if item["kind"].startswith("referral_level_"):
+                continue
+            sign = "+" if float(item["amount"]) >= 0 else ""
+            normal.append(f"• {item['kind'].replace('_',' ').title()}: {sign}₹{format_money(float(item['amount']))}")
+        totals={1:0.0,2:0.0,3:0.0}
+        for row in sums: totals[int(row["level"])]=float(row["total"])
+        details=[]
+        for item in refs:
+            name=item["first_name"] or (f"@{item['username']}" if item["username"] else str(item["source_user_id"]))
+            details.append(
+                f"• Level {item['level']}: +₹{format_money(float(item['commission_amount']))}\n"
+                f"  From: {name}\n"
+                f"  Base Reward: ₹{format_money(float(item['base_amount']))}\n"
+                f"  Rate: {format_money(float(item['rate']))}%\n"
+                f"  Source: {item['source_kind'].replace('_',' ').title()}"
+            )
         await edit_or_send(
             query,
-            "📜 <b>RECENT ACTIVITY</b>\n\n" + body,
+            "📜 <b>RECENT ACTIVITY</b>\n\n"
+            "<b>Rewards & Withdrawals</b>\n" + ("\n".join(normal) if normal else "No task activity yet.") +
+            "\n\n━━━━━━━━━━━━━━━━━━━━\n"
+            "<b>Referral Commission Summary</b>\n"
+            f"Level 1: ₹{format_money(totals[1])}\n"
+            f"Level 2: ₹{format_money(totals[2])}\n"
+            f"Level 3: ₹{format_money(totals[3])}\n"
+            f"Total: ₹{format_money(sum(totals.values()))}\n\n"
+            "<b>Recent Referral Details</b>\n" + ("\n\n".join(details) if details else "No referral commission yet."),
             back_keyboard(),
         )
         return
@@ -1582,6 +1606,15 @@ def scratch_claim():
         conn.commit()
 
     log_activity(f"{key}_scratch_claimed", user_id, f"₹{reward}")
+    heading = (
+        f"🎉 <b>₹{reward} REWARD ADDED</b>\n"
+        + ("Your next challenge is now <b>Complete Registration</b>." if stage == 1
+           else "Your next challenge is now <b>Complete Newbie Order</b>.")
+    )
+    try:
+        send_refreshed_dashboard(user_id, heading)
+    except Exception as exc:
+        logger.warning("Unable to send refreshed scratch dashboard: %s", exc)
     return jsonify(ok=True, reward=reward, already=False)
 
 
@@ -1683,7 +1716,18 @@ def wheel_spin():
         conn.commit()
 
     log_activity("lucky_wheel_claimed", user_id, f"₹{reward}")
+    try:
+        send_refreshed_dashboard(user_id, f"🎉 <b>₹{reward} LUCKY WHEEL REWARD ADDED</b>\nAll reward challenges are now completed.")
+    except Exception as exc:
+        logger.warning("Unable to send refreshed wheel dashboard: %s", exc)
     return jsonify(ok=True, reward=reward, already=False)
+
+
+def send_refreshed_dashboard(user_id: int, heading: str = "✅ Dashboard Updated") -> None:
+    user = get_user(user_id)
+    if not user:
+        return
+    send_bot_message(user_id, f"{heading}\n\n{dashboard_text(user)}", dashboard_keyboard(user))
 
 
 def send_bot_message(
@@ -1799,16 +1843,15 @@ def admin_dashboard():
             ).fetchone()[0],
         }
 
-        proofs = conn.execute(
-            """
-            SELECT r.*, u.first_name, u.username,
-                   u.registration_id, u.newbie_id,
-                   u.registration_proof, u.newbie_proof
-            FROM reviews r
-            JOIN users u ON u.user_id=r.user_id
-            WHERE r.status='pending'
-            ORDER BY r.id DESC
-            """
+        registration_proofs = conn.execute(
+            """SELECT r.*, u.first_name, u.username, u.registration_id, u.registration_proof
+            FROM reviews r JOIN users u ON u.user_id=r.user_id
+            WHERE r.status='pending' AND r.kind='registration' ORDER BY r.id DESC"""
+        ).fetchall()
+        newbie_proofs = conn.execute(
+            """SELECT r.*, u.first_name, u.username, u.newbie_id, u.newbie_proof
+            FROM reviews r JOIN users u ON u.user_id=r.user_id
+            WHERE r.status='pending' AND r.kind='newbie' ORDER BY r.id DESC"""
         ).fetchall()
 
         withdrawals = conn.execute(
@@ -1838,7 +1881,8 @@ def admin_dashboard():
     return render_template(
         "admin.html",
         stats=stats,
-        proofs=proofs,
+        registration_proofs=registration_proofs,
+        newbie_proofs=newbie_proofs,
         withdrawals=withdrawals,
         activities=activities,
         users=users,
@@ -2060,6 +2104,7 @@ def save_settings():
         "referral_level1": request.form.get("referral_level1", "").strip(),
         "referral_level2": request.form.get("referral_level2", "").strip(),
         "referral_level3": request.form.get("referral_level3", "").strip(),
+        "rewards_enabled": "1" if request.form.get("rewards_enabled") == "on" else "0",
     }
 
     try:

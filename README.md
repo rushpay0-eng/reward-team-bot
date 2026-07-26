@@ -65,3 +65,18 @@ Default commission rates:
 - Level 3: 0.1%
 
 Referral commission applies to First Scratch, Second Scratch, Lucky Wheel and Daily Check-in rewards.
+
+
+## Final Polished Patch
+
+- Dashboard displays Task Balance, Referral Balance, Total Referral Earnings and Total Available.
+- Community button text is `Join Community`.
+- The first Scratch Card performs a live Channel and Group membership check when opened and claimed.
+- Telegram controls message-bubble width, but the wider separator layout improves presentation.
+
+
+## Final Admin Update
+- Instant refreshed dashboard after Scratch and Wheel claim.
+- Detailed Level 1/2/3 referral activity.
+- Separate Registration, Newbie and Withdrawal sections.
+- Compact dashboard metrics and central Update Amounts section.
