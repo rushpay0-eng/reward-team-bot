@@ -1,1 +1,202 @@
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/admin.css"><title>Admin Panel</title></head><body><header><b>Reward Bot Admin</b><a href="/admin/logout">Logout</a></header><main><section class="cards"><div><span>Total Users</span><strong>{{counts.users}}</strong></div><div><span>Verified</span><strong>{{counts.verified}}</strong></div><div><span>Pending Proofs</span><strong>{{counts.proofs}}</strong></div><div><span>Pending Withdrawals</span><strong>{{counts.withdrawals}}</strong></div></section><h2>Proof Approvals</h2><div class="table"><table><tr><th>User</th><th>Type</th><th>ID</th><th>Action</th></tr>{% for r in proofs %}<tr><td>{{r.first_name}}<br><small>@{{r.username or 'none'}} · {{r.user_id}}</small></td><td>{{r.kind}}</td><td>{{r.registration_id if r.kind=='registration' else r.newbie_id}}</td><td>{% if r.kind=='newbie' %}<form class="inline" method="post" action="/admin/proof/{{r.id}}/approve"><select name="reward"><option>50</option><option>100</option><option>200</option><option>300</option><option>400</option><option>500</option></select><button class="ok">Approve</button></form>{% else %}<form class="inline" method="post" action="/admin/proof/{{r.id}}/approve"><button class="ok">Approve</button></form>{% endif %}<form class="inline" method="post" action="/admin/proof/{{r.id}}/reject"><input name="reason" placeholder="Reason"><button class="bad">Reject</button></form></td></tr>{% else %}<tr><td colspan="4">No pending proof</td></tr>{% endfor %}</table></div><h2>Withdrawals</h2><div class="table"><table><tr><th>User</th><th>Amount</th><th>UPI</th><th>Action</th></tr>{% for w in withdrawals %}<tr><td>{{w.first_name}}<br><small>@{{w.username or 'none'}}</small></td><td>₹{{w.amount}}</td><td>{{w.upi_id}}</td><td><form class="inline" method="post" action="/admin/withdrawal/{{w.id}}/paid"><button class="ok">Mark Paid</button></form><form class="inline" method="post" action="/admin/withdrawal/{{w.id}}/reject"><input name="reason" placeholder="Reason"><button class="bad">Reject</button></form></td></tr>{% else %}<tr><td colspan="4">No pending withdrawal</td></tr>{% endfor %}</table></div><h2>Users</h2><div class="table"><table><tr><th>User</th><th>Balance</th><th>Registration</th><th>Newbie</th><th>Control</th></tr>{% for u in users %}<tr><td>{{u.first_name}}<br><small>@{{u.username or 'none'}} · {{u.user_id}}</small></td><td>₹{{u.balance}}</td><td>{{u.registration_status}}</td><td>{{u.newbie_status}}</td><td><form method="post" action="/admin/user/{{u.user_id}}/toggle"><button class="{{'ok' if u.blocked else 'bad'}}">{{'Unblock' if u.blocked else 'Block'}}</button></form></td></tr>{% endfor %}</table></div></main></body></html>
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reward Bot Admin</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <strong>Reward Bot Admin</strong>
+    <span>Professional Control Centre</span>
+  </div>
+  <a href="/admin/logout">Logout</a>
+</header>
+
+<main class="container">
+  {% if request.args.get('settings_saved') %}
+    <div class="alert success">Reward settings saved successfully.</div>
+  {% endif %}
+  {% if request.args.get('settings_error') %}
+    <div class="alert error">{{ request.args.get('settings_error') }}</div>
+  {% endif %}
+
+  <section class="stats-grid">
+    <article><span>New Users · 24h</span><strong>{{ stats.new_users }}</strong></article>
+    <article><span>Verified Users</span><strong>{{ stats.verified }}</strong></article>
+    <article><span>Proofs · 24h</span><strong>{{ stats.proofs_24h }}</strong></article>
+    <article><span>Pending Proofs</span><strong>{{ stats.pending_proofs }}</strong></article>
+    <article><span>Withdrawals · 24h</span><strong>{{ stats.withdrawals_24h }}</strong></article>
+    <article><span>Pending Withdrawals</span><strong>{{ stats.pending_withdrawals }}</strong></article>
+    <article><span>Paid Amount · 24h</span><strong>₹{{ stats.paid_amount_24h }}</strong></article>
+    <article><span>Daily Bonus · 24h</span><strong>{{ stats.daily_claims_24h }} / ₹{{ stats.daily_amount_24h }}</strong></article>
+    <article><span>New Referrals · 24h</span><strong>{{ stats.referrals_24h }}</strong></article>
+    <article><span>Referral Commission · 24h</span><strong>₹{{ '%.2f'|format(stats.referral_amount_24h) }}</strong></article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <div>
+        <h2>Reward Settings</h2>
+        <p>New settings apply only to rewards not yet assigned or claimed.</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/settings" class="settings-form">
+      <div class="form-group">
+        <h3>Welcome Scratch</h3>
+        <label>Minimum Reward<input type="number" name="first_min" value="{{ settings.first_min }}" min="0" required></label>
+        <label>Maximum Reward<input type="number" name="first_max" value="{{ settings.first_max }}" min="0" required></label>
+      </div>
+
+      <div class="form-group">
+        <h3>Registration Scratch</h3>
+        <label>Minimum Reward<input type="number" name="second_min" value="{{ settings.second_min }}" min="0" required></label>
+        <label>Maximum Reward<input type="number" name="second_max" value="{{ settings.second_max }}" min="0" required></label>
+      </div>
+
+      <div class="form-group">
+        <h3>Lucky Wheel</h3>
+        <label>Rewards, comma separated<input name="wheel_values" value="{{ settings.wheel_values }}" required></label>
+        <label>Weights, comma separated<input name="wheel_weights" value="{{ settings.wheel_weights }}" required></label>
+      </div>
+
+      <div class="form-group">
+        <h3>Withdrawal & Daily Bonus</h3>
+        <label>Minimum Withdrawal<input type="number" name="minimum_withdrawal" value="{{ settings.minimum_withdrawal }}" min="0" required></label>
+        <label class="switch-label"><input type="checkbox" name="daily_enabled" {% if settings.daily_enabled == '1' %}checked{% endif %}> Enable Daily Check-in</label>
+        <label>Daily Minimum<input type="number" name="daily_min" value="{{ settings.daily_min }}" min="0" required></label>
+        <label>Daily Maximum<input type="number" name="daily_max" value="{{ settings.daily_max }}" min="0" required></label>
+      </div>
+
+      <div class="form-group">
+        <h3>3-Level Referral Commission</h3>
+        <label class="switch-label"><input type="checkbox" name="referral_enabled" {% if settings.referral_enabled == '1' %}checked{% endif %}> Enable Referral System</label>
+        <label>Level 1 Percentage<input type="number" step="0.01" name="referral_level1" value="{{ settings.referral_level1 }}" min="0" max="100" required></label>
+        <label>Level 2 Percentage<input type="number" step="0.01" name="referral_level2" value="{{ settings.referral_level2 }}" min="0" max="100" required></label>
+        <label>Level 3 Percentage<input type="number" step="0.01" name="referral_level3" value="{{ settings.referral_level3 }}" min="0" max="100" required></label>
+      </div>
+
+      <button class="primary-btn" type="submit">Save Reward Settings</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <div><h2>Pending Proof Approvals</h2><p>Tap an image to view the full proof.</p></div>
+      <span class="badge">{{ proofs|length }} pending</span>
+    </div>
+    <div class="proof-grid">
+      {% for proof in proofs %}
+      <article class="proof-card">
+        <a href="/admin/proof-image/{{ proof.kind }}/{{ proof.user_id }}" target="_blank">
+          <img src="/admin/proof-image/{{ proof.kind }}/{{ proof.user_id }}" alt="Proof image">
+        </a>
+        <div class="proof-body">
+          <h3>{{ proof.first_name }}</h3>
+          <p>@{{ proof.username or 'no_username' }} · {{ proof.user_id }}</p>
+          <p><b>Type:</b> {{ proof.kind|title }}</p>
+          <p><b>Submitted ID:</b> {{ proof.registration_id if proof.kind == 'registration' else proof.newbie_id }}</p>
+          <p><b>Uploaded:</b> {{ proof.created_at }}</p>
+
+          <form method="post" action="/admin/proof/{{ proof.id }}/approve">
+            <button class="success-btn">Approve</button>
+          </form>
+          <form method="post" action="/admin/proof/{{ proof.id }}/reject" class="reject-form">
+            <input name="reason" placeholder="Rejection reason" required>
+            <button class="danger-btn">Reject</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <div class="empty">No pending proof approvals.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title"><div><h2>Withdrawal History</h2><p>Latest 100 requests with status and payment details.</p></div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>User</th><th>Amount</th><th>UPI ID</th><th>Created</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for item in withdrawals %}
+          <tr>
+            <td>{{ item.first_name }}<small>@{{ item.username or 'none' }} · {{ item.user_id }}</small></td>
+            <td>₹{{ item.amount }}</td>
+            <td>{{ item.upi_id }}</td>
+            <td>{{ item.created_at }}</td>
+            <td><span class="status {{ item.status }}">{{ item.status }}</span></td>
+            <td>
+              {% if item.status == 'pending' %}
+              <form method="post" action="/admin/withdrawal/{{ item.id }}/paid" class="inline">
+                <button class="success-btn">Mark Paid</button>
+              </form>
+              <form method="post" action="/admin/withdrawal/{{ item.id }}/reject" class="inline">
+                <input name="reason" placeholder="Reason" required>
+                <button class="danger-btn">Reject</button>
+              </form>
+              {% else %}
+                {{ item.reason or '—' }}
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6">No withdrawal records.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title"><div><h2>Last 24 Hours Activity</h2><p>Proofs, rewards, daily check-ins and withdrawal updates.</p></div></div>
+    <div class="timeline">
+      {% for activity in activities %}
+      <article>
+        <span class="dot"></span>
+        <div>
+          <strong>{{ activity.action.replace('_', ' ')|title }}</strong>
+          <p>{{ activity.first_name or 'System' }} · {{ activity.username or activity.user_id or 'Admin' }}</p>
+          <small>{{ activity.details or 'No additional details' }} · {{ activity.created_at }}</small>
+        </div>
+      </article>
+      {% else %}
+      <div class="empty">No activity in the last 24 hours.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title"><div><h2>Latest Users</h2><p>Balances, stages and account control.</p></div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>User</th><th>Task Balance</th><th>Referral Balance</th><th>Referrer</th><th>Registration</th><th>Newbie</th><th>Daily</th><th>Control</th></tr></thead>
+        <tbody>
+        {% for user in users %}
+          <tr>
+            <td>{{ user.first_name }}<small>@{{ user.username or 'none' }} · {{ user.user_id }}</small></td>
+            <td>₹{{ user.balance }}</td>
+            <td>₹{{ '%.2f'|format(user.referral_balance or 0) }}</td>
+            <td>{{ user.referrer_id or 'Direct' }}</td>
+            <td>{{ user.registration_status }}</td>
+            <td>{{ user.newbie_status }}</td>
+            <td>{{ user.last_checkin_date or 'Never' }}</td>
+            <td>
+              <form method="post" action="/admin/user/{{ user.user_id }}/toggle-block">
+                <button class="{{ 'success-btn' if user.blocked else 'danger-btn' }}">
+                  {{ 'Unblock' if user.blocked else 'Block' }}
+                </button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>
